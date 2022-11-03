@@ -39,7 +39,24 @@ final class HomeIdpDiscoveryAuthenticator extends AbstractUsernameFormAuthentica
 
         if (loginHint != null || rememberMeUsername != null) {
             if (loginHint != null) {
-                formData.add(AuthenticationManager.FORM_USERNAME, loginHint);
+            	
+            	// WITCO patch: copy steps from action
+                String username = setUserInContextFromUsername(context, loginHint);
+                if (username == null) {
+                    return;
+                }
+
+                UserModel user = context.getUser();
+
+                final Optional<IdentityProviderModel> homeIdp = discoverHomeIdp(context, user, username);
+
+                if (homeIdp.isEmpty()) {
+                    context.attempted();
+                } else {
+                    new Redirector(context).redirectTo(homeIdp.get());
+                }
+                return;
+                // End Witco patch
             } else {
                 formData.add(AuthenticationManager.FORM_USERNAME, rememberMeUsername);
                 formData.add("rememberMe", "on");
@@ -77,7 +94,11 @@ final class HomeIdpDiscoveryAuthenticator extends AbstractUsernameFormAuthentica
         context.clearUser();
 
         String username = inputData.getFirst(AuthenticationManager.FORM_USERNAME);
+        return setUserInContextFromUsername(context, username);
+    }
 
+    // Witco patch: split setUserInContext in two methods
+    private String setUserInContextFromUsername(AuthenticationFlowContext context, String username) {
         if (username != null) {
             username = username.trim();
             if ("".equalsIgnoreCase(username))
